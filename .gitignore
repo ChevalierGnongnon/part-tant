@@ -1,2 +1,6 @@
 secrets/
-.dockerignore
+.env
+node_modules/
+dist/
+srcs/cpp_algos/obj/
+srcs/cpp_algos/text_analyser

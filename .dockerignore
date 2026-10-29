@@ -3,3 +3,4 @@
 srcs/cpp_algos/obj
 ./text_analyser
 srcs/docker/secrets
+srcs/cpp_algos/text_analyser

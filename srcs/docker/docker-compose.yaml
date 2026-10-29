@@ -24,6 +24,7 @@ services:
         condition: service_healthy
   mariadb:
     image: mariadb:12.3
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     container_name: mariadb
     volumes:
       - mariadb_data:/var/lib/mysql

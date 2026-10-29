@@ -1,0 +1,5 @@
+**/node_modules
+.git
+srcs/cpp_algos/obj
+./text_analyser
+srcs/docker/secrets

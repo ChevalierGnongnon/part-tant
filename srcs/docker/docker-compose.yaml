@@ -1,0 +1,116 @@
+services:
+  nginx:
+    image: nginx:1.31-alpine
+    container_name: nginx
+    ports:
+      - "8443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d/:ro
+      # - ./nginx/404-page-not-found.html:/usr/share/nginx/html/404-page-not-found.html:ro
+    networks:
+      - part-tant
+    env_file:
+      - ./secrets/.env
+    secrets:
+      - ssl_certificate
+      - ssl_private_key
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+      mariadb:
+        condition: service_healthy
+  mariadb:
+    image: mariadb:12.3
+    container_name: mariadb
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./mariadb/initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - part-tant
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    environment:
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/mariadb_root_password
+      MARIADB_PASSWORD_FILE: /run/secrets/mariadb_password
+    env_file: secrets/.env
+    secrets:
+      - mariadb_password
+      - mariadb_root_password
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: srcs/docker/frontend/Dockerfile
+    image: frontend:part-tant
+    container_name: frontend
+    volumes:
+      - ../frontend:/app
+      - react_node_modules:/app/node_modules
+    networks:
+      - part-tant
+    restart: unless-stopped
+    env_file: secrets/.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  backend:
+    build:
+      context: ../..
+      dockerfile: srcs/docker/backend/Dockerfile
+    image: backend:part-tant
+    container_name: backend
+    volumes:
+      - ../backend:/app
+      - express_node_modules:/app/node_modules
+      - uploads:/app/uploads
+    networks:
+      - part-tant
+    restart: unless-stopped
+    environment:
+      MARIADB_PASSWORD_FILE: /run/secrets/mariadb_password
+      ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+    env_file: secrets/.env
+    secrets:
+      - mariadb_password
+      - admin_password
+    healthcheck:
+      test: ["CMD", "node", "/app/src/scripts/healthcheck.js"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+secrets:
+  admin_password:
+    file: ./secrets/accounts/admin_password.txt
+  mariadb_password:
+    file: ./secrets/mariadb/mariadb_password.txt
+  mariadb_root_password:
+    file: ./secrets/mariadb/mariadb_root_password.txt
+  ssl_private_key:
+    file: ./secrets/certs/part-tant_private.key
+  ssl_certificate:
+    file: ./secrets/certs/part-tant.crt
+
+volumes:
+  react_node_modules:
+  express_node_modules:
+  mariadb_data:
+  uploads:
+
+networks:
+  part-tant:
+    driver: bridge
